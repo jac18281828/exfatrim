@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make clean && make
+      - name: Install shellcheck
+        run: brew install shellcheck
+      - name: shellcheck
+        run: shellcheck test/test.sh
+      - name: py_compile
+        run: python3 -I -m py_compile test/verify_zero.py test/exfat_patch.py test/hold_lock.py
+
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: make test
+        run: make test
