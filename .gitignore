@@ -1,4 +1,4 @@
 exfatrim
-trimcheck
 *.o
 *.dSYM/
+__pycache__/
