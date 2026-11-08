@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT
+name: Yamlfmt
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  run-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.x
+      - name: Install yamlfmt
+        run: |
+          go install github.com/google/yamlfmt/cmd/yamlfmt@v0.21.0
+          strip $(which yamlfmt)
+      - name: Run yamlfmt
+        run: yamlfmt -lint .github/workflows/*.yml
