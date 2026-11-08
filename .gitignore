@@ -1,0 +1,4 @@
+exfatrim
+trimcheck
+*.o
+*.dSYM/
