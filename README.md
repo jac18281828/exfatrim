@@ -106,7 +106,7 @@ Each module in `src/` has a header of the same name.
 | `exfat` | boot sector, checksum, geometry checks, FAT chains, root directory, allocation bitmap and the metadata cross-checks; reads only through a callback |
 | `walk` | the bitmap's free runs, shrunk inward to the alignment unit, as extents; no I/O |
 | `trim` | batches extents into `DKIOCUNMAP` calls and counts bytes after each successful call |
-| `verify` | the sampling population, draws, the before and after reads and the 95% bound |
+| `verify` | the sample size for a confidence level, the sampling population, draws and the before and after reads |
 | `device` | raw aligned reads, the unmap ioctl, the exclusive lock, block size and feature queries |
 | `volume` | resolving the argument, unmount, `fsck_exfat`, remount on every exit path and signals |
 | `report` | human-readable sizes, the output lines and the first-run notice |
@@ -119,7 +119,7 @@ can feed them corrupt volumes.
 ## Usage
 
 ```
-sudo exfatrim [-n] [-v] [-y] [volume]
+sudo exfatrim [-n] [-v] [--verify <pct>] [-y] [volume]
 ```
 
 `volume` is a name (`SSD`), a mount point (`/Volumes/SSD`) or a disk id
@@ -130,7 +130,8 @@ unmounted can be named by disk id; it stays unmounted.
 | Flag | Effect |
 |---|---|
 | `-n` | Dry run. Reads the volume and reports what a trim would cover. Changes nothing and never asks for confirmation. |
-| `-v` | Verify. Samples free clusters that hold leftovers, trims, then reports how many the drive now reads as zeros. |
+| `-v` | Verify at 95% confidence. Samples free clusters that hold leftovers, trims, then checks that the drive now reads them as zeros. |
+| `--verify <pct>` | Verify at `<pct>` confidence, a decimal number from 50 to 99.9. The argument is required and separate (`--verify 99`). Anything else is a usage error, exit 2. With `-v`, the `--verify` value wins. |
 | `-y` | Skip the first-run confirmation for this run and write no marker. |
 
 ```
@@ -142,8 +143,20 @@ SSD (dry run): would trim 412 GB in 1873 range(s). Nothing changed.
 $ sudo exfatrim -v SSD
 ✓ SSD trimmed: 412 GB of free space handed back to the SSD (38s).
   Free to use: 412 GB of 2.0 TB. Ready to use. Next trim: ~Dec 8.
-  Verified: 299 of 299 sampled leftovers now read as zeros (≥99.0% cleared, 95% confidence).
+  Trim checked: the drive cleared what was trimmed.
 ```
+
+`-v` ends with one of four lines. [How `-v` works](#how--v-works) explains the
+sample behind them.
+
+| Outcome | Line | Stream | Exit |
+|---|---|---|---|
+| Enough leftovers sampled, all cleared | `Trim checked: the drive cleared what was trimmed.` | stdout | 0 |
+| No leftovers found | `Trim checked: free space already reads as zeros.` | stdout | 0 |
+| Fewer leftovers than the sample size, all cleared | `Trim checked on <n> samples; too few leftovers to check fully.` | stdout | 0 |
+| A sampled leftover still holds data | `✗ Trim not confirmed: the drive still returns old data. It may ignore TRIM, or keep data until it erases.` | stderr | 3 |
+
+A volume with no free clusters prints `Verified: no free clusters to sample.`
 
 An error prints one `✗` line. Indented lines follow only when they give a
 command to run or a choice to make.
@@ -198,34 +211,47 @@ leftovers.
 ## How `-v` works
 
 A free cluster can show a trim only if it held leftovers first. `-v` therefore
-samples free clusters and keeps the ones with a nonzero byte, which this section
-calls dirty samples. A dirty sample is the statistical unit; the leftovers are
-what it holds. `-v` trims, then reads the dirty samples again.
+samples free clusters and keeps the ones with a nonzero byte, the sampled
+leftovers. It trims, then reads the sampled leftovers again. A trimmed cluster
+reads as zeros.
 
 - Population. Free clusters that lie wholly inside an extent `exfatrim` sends.
   A free cluster at the edge of a run may be shrunk out of its extent and never
   unmapped, so it is not eligible.
+- Sample size. N = ⌈ln(1 − c) / ln(0.99)⌉ sampled leftovers for confidence c.
+  N does not depend on the size of the drive.
+
+  | Confidence | N |
+  |---|---|
+  | 50% | 69 |
+  | 60% | 92 |
+  | 95% (`-v`) | 299 |
+  | 99% | 459 |
+  | 99.9% | 688 |
+
 - Draws. Distinct clusters chosen uniformly at random with
-  `arc4random_uniform`, stopping at 299 dirty samples or at
+  `arc4random_uniform`, stopping at N sampled leftovers or at
   min(3,000, population) draws.
-- Read size. The first `min(cluster size, 1 MiB)` of each cluster. A sampled
-  cluster is unmapped whole, so its first MiB stands for it, and a run on 32
-  MiB clusters reads about 3 GB at most.
+- Read size. The first `min(cluster size, 128 KiB)` of each cluster, before and
+  after the trim. A sampled cluster is unmapped whole, so its first 128 KiB
+  stands for it. exFAT's default 128 KiB cluster is read whole: a default run
+  reads about 39 MB before the trim and the same again after, and 3,000 draws
+  read at most about 390 MB before the trim.
 - Timing. The first read happens on the unmounted volume after every safety
   check has passed and before the first unmap. The second read happens after
   the last unmap and before the volume mounts again, because mounting writes
   and frees clusters of its own.
-- Bound. If all N dirty samples read as zeros, the share of leftovers the drive
-  cleared is at least `0.05^(1/N)` with 95% confidence. N = 299 gives 99.0%,
-  N = 59 gives 95.0% and N = 30 gives 90.4%.
+- Bound. If all N sampled leftovers read as zeros, the drive left fewer than 1%
+  of its leftovers uncleared, with the chosen confidence. At 95% the rule of
+  three gives the same figure: about 3 ÷ N, or 1.0% at N = 299.
 
-If no dirty sample exists, the sampled free space already reads as zeros and the
-run exits 0.
+If no leftover is sampled, the sampled free space already reads as zeros and the
+run exits 0. If fewer than N are sampled, all of them cleared, the run exits 0
+and prints how many it checked.
 
-Exit 3 means at least one dirty sample still holds leftovers. A drive that
-ignored TRIM and a drive that does not return zeros for trimmed blocks look the
-same, so exit 3 says the trim could not be confirmed and does not say which
-cause applies.
+Exit 3 means at least one sampled leftover still holds data. A drive that
+ignored TRIM and a drive that keeps data until it erases look the same, so exit
+3 says the trim could not be confirmed and does not say which cause applies.
 
 With `-n -v`, `exfatrim` draws the same sample on the mounted volume,
 read-only, and reports the share that still holds leftovers.
@@ -235,8 +261,8 @@ read-only, and reports the share that still holds leftovers.
 `make test` needs macOS 26 or later (`diskutil image`), `python3` and no
 `sudo`. It builds and runs the unit tests, then the disk-image tests.
 
-Unit tests (`test/unit.c`) link `src/exfat.c` and `src/walk.c` to an in-memory
-read callback and need no disk image. They build a valid volume in memory, then
+Unit tests (`test/unit.c`) link `src/exfat.c`, `src/walk.c`, `src/verify.c` and
+`src/device.c`, feed `exfat` an in-memory read callback and need no disk image. They build a valid volume in memory, then
 break it one structure at a time. Each refusal case asserts the specific
 status code and the user-facing text: a bad signature or checksum, revision 2,
 a FAT offset below 24 sectors, a heap overlapping the FAT, the media-failure
@@ -244,7 +270,10 @@ and dirty flags, a bitmap length one too long or one too short, a self-loop and
 a two-cluster loop in the bitmap chain, a chain leaving the heap, two bitmaps
 and a root directory marked free. The walk cases cover a run shorter than the
 alignment unit, a run touching the heap's end, clusters smaller than the
-alignment unit, no free run and every cluster free.
+alignment unit, no free run and every cluster free. The free-space cases check
+both sides of the 1% cross-check against macOS's reading. The sample-size cases
+check N at 50, 60, 95, 99 and 99.9, and the argument cases check which
+`--verify` values parse.
 
 The image tests attach disk images they create, run `exfatrim` only against
 them, address each by the device id they recorded or the unique volume name
@@ -258,8 +287,15 @@ they gave it, and detach them on exit.
 - Per cluster size (4 KB, 32 KB and 128 KB): live files stay byte-identical,
   `fsck_exfat -n` is clean and every free cluster is zero after a trim of the
   unmounted volume.
-- A second `-v` run right after a trim of the unmounted volume reports no
-  sampled leftover. A dry run changes no byte of the device.
+- A second `-v` run right after a trim of the unmounted volume prints the
+  "already reads as zeros" line. A dry run changes no byte of the device.
+- Each `-v` outcome: `--verify 50` and `--verify 99.9` on RAW images with
+  enough leftovers print the full-check line, `--verify 99.9` on a 512-cluster
+  image prints the too-few line, and a SPARSE image prints the exit-3 line on
+  stderr. `--verify 49.9`, `--verify 100`, `--verify abc` and a bare `--verify`
+  exit 2.
+- Leftovers written only into the second 64 KiB of 128 KiB clusters are found
+  and cleared, so the 128 KiB read covers the whole cluster.
 - Volume name, mount point and disk id (with and without `/dev/` and
   `/dev/r`) all resolve.
 - Corrupted volumes are refused with the volume bytes unchanged: a bitmap bit
@@ -268,7 +304,8 @@ they gave it, and detach them on exit.
   a FAT offset below 24 sectors, a media-failure flag, and a device another
   process holds.
 - The first-run confirmation runs through a pseudo-terminal: `n` and end of
-  input exit 1 with the volume still mounted and its files unchanged; `y`
+  input exit 1 with the volume still mounted and its files unchanged, and the
+  notice matches `test/first-run-warning.txt` line for line; `y`
   trims and writes the marker; a second run with the marker asks nothing; `-n`
   and `-y` never ask; with no terminal, no marker and no `-y` the run exits 1.
 
