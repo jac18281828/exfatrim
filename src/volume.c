@@ -125,7 +125,7 @@ void volume_resolve(const char *arg)
                 pick = i;
             }
         if (hits == 0)
-            die("No exFAT volume is mounted. Plug in the drive, or name it: sudo %s \"My SSD\"", g_volume.prog);
+            die("No exFAT volume is mounted. Plug in the drive, or name it: sudo %s SSD", g_volume.prog);
         if (hits > 1) {
             const char **names = calloc((size_t)hits, sizeof *names);
             if (!names) die("Out of memory.");

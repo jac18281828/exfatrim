@@ -7,7 +7,7 @@
  *   1. unmounts the volume,
  *   2. checks it with Apple's fsck_exfat (refuses to touch a damaged volume),
  *   3. locks the raw device, reads exFAT's allocation bitmap and cross-checks it,
- *   4. with -v, samples free clusters that hold data,
+ *   4. with -v, samples free clusters that hold leftovers,
  *   5. sends DKIOCUNMAP for the free clusters only,
  *   6. with -v, re-reads the sample: a trimmed cluster reads as zeros,
  *   7. mounts the volume again.
@@ -17,9 +17,10 @@
  *
  * Build:  make            (clang, C17 with -pedantic -Werror; sources in src/)
  * Use:    sudo exfatrim                    (the one mounted exFAT volume)
- *         sudo exfatrim "My SSD"           (by name, mount point or diskNsM)
- *         sudo exfatrim -n "My SSD"        (dry run: report only, change nothing)
- *         sudo exfatrim -v "My SSD"        (trim, then verify the drive dropped the data)
+ *         sudo exfatrim SSD                (by name, mount point or diskNsM)
+ *         sudo exfatrim -n SSD             (dry run: report only, change nothing)
+ *         sudo exfatrim -v SSD             (trim, then verify the drive dropped the leftovers)
+ *         sudo exfatrim -y SSD             (trim without the first-run confirmation)
  *
  * Exit status: 0 success, 1 refused or error, 2 usage, 3 trim not confirmed
  * (-v), 4 trimmed but the volume did not mount again.

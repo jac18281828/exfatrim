@@ -102,7 +102,7 @@ raw_sum() {
 }
 
 verified_counts() {
-    local re='Verified: ([0-9]+) of ([0-9]+) dirty'
+    local re='Verified: ([0-9]+) of ([0-9]+) sampled leftovers'
     [[ $OUT =~ $re ]] || fail "no verification line: $OUT"
     CLEARED=${BASH_REMATCH[1]}
     NDIRTY=${BASH_REMATCH[2]}
@@ -111,7 +111,7 @@ verified_counts() {
 expect_trim_confirmed() {
     [ "$RC" -eq 0 ] || fail "$1: exit $RC: $OUT"
     verified_counts
-    [ "$NDIRTY" -ge 1 ] || fail "$1: no dirty samples: $OUT"
+    [ "$NDIRTY" -ge 1 ] || fail "$1: no sampled leftovers: $OUT"
     [ "$CLEARED" -eq "$NDIRTY" ] || fail "$1: $CLEARED of $NDIRTY cleared"
 }
 
@@ -130,9 +130,9 @@ trim_whole_volumes() {
         before=$(raw_sum)
         run "$BIN" -n -v "$DISK"
         [ "$RC" -eq 0 ] || fail "dry run -v (cluster $cluster): exit $RC: $OUT"
-        re='Deleted data: ([0-9]+) of ([0-9]+)'
+        re='Leftovers: ([0-9]+) of ([0-9]+)'
         [[ $OUT =~ $re ]] || fail "no dry-run sample line: $OUT"
-        [ "${BASH_REMATCH[1]}" -ge 1 ] || fail "dry run found no deleted data: $OUT"
+        [ "${BASH_REMATCH[1]}" -ge 1 ] || fail "dry run found no leftovers: $OUT"
         [ "$(raw_sum)" = "$before" ] || fail "dry run changed the device (cluster $cluster)"
 
         mount_volume
@@ -149,8 +149,8 @@ trim_whole_volumes() {
         python3 -I "$HERE/verify_zero.py" "$RAW" || fail "free space not zeroed (cluster $cluster)"
         run "$BIN" -y -v "$DISK"
         [ "$RC" -eq 0 ] || fail "second trim (cluster $cluster): exit $RC: $OUT"
-        [[ $OUT == *"0 of 0 dirty free clusters; all "*"already read as zeros"* ]] \
-            || fail "second trim reported dirty clusters (cluster $cluster): $OUT"
+        [[ $OUT == *"Verified: all "*"sampled free clusters already read as zeros"* ]] \
+            || fail "second trim reported leftovers (cluster $cluster): $OUT"
 
         mount_volume
         check_sums "after trim by id (cluster $cluster)"

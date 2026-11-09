@@ -72,13 +72,13 @@ void report_usage(const char *prog)
     fprintf(stderr,
             "usage: sudo %s [-n] [-v] [-y] [volume]\n"
             "  Unmounts an exFAT volume, TRIMs its free space, and mounts it again.\n"
-            "  volume  name (\"My SSD\"), mount point, or disk id (disk4s2).\n"
+            "  volume  name (SSD), mount point (/Volumes/SSD), or disk id (disk4s2).\n"
             "          Omit it when only one exFAT volume is mounted.\n"
             "  -n      dry run: report what would be trimmed; change nothing.\n"
-            "  -v      verify: sample up to 299 free clusters that held data before the\n"
+            "  -v      verify: sample up to 299 free clusters that held leftovers before the\n"
             "          trim and report how many the drive now reads as zeros, with a\n"
             "          95%% confidence bound. With -n, report how much sampled free\n"
-            "          space still holds deleted data.\n"
+            "          space still holds leftovers.\n"
             "  -y      skip the first-run confirmation; write no marker.\n"
             "exit status: 0 success, 1 refused or error, 2 usage, 3 trim not confirmed\n"
             "  (-v), 4 trimmed but the volume did not mount again.\n",
@@ -148,34 +148,28 @@ void report_trimmed(const char *name, uint64_t trimmed, const struct timespec *s
 void report_dry_sample(uint32_t ndirty, uint32_t draws)
 {
     if (draws == 0) {
-        printf("  Deleted data: no free clusters to sample.\n");
+        printf("  Leftovers: no free clusters to sample.\n");
         return;
     }
-    printf("  Deleted data: %u of %u sampled free clusters (%.0f%%) still hold data.\n", ndirty, draws,
-           100.0 * ndirty / draws);
+    printf("  Leftovers: %u of %u sampled free clusters (%.0f%%).\n", ndirty, draws, 100.0 * ndirty / draws);
 }
 
 void report_verified(uint32_t draws, uint32_t ndirty, uint32_t cleared, double bound)
 {
     if (ndirty == 0) {
-        if (draws == 0)
-            printf("  Verified: 0 of 0 dirty free clusters; no free clusters to sample.\n");
-        else
-            printf("  Verified: 0 of 0 dirty free clusters; all %u sampled free clusters already read as zeros, so an "
-                   "earlier trim worked.\n",
-                   draws);
+        if (draws == 0) printf("  Verified: no free clusters to sample.\n");
+        else printf("  Verified: all %u sampled free clusters already read as zeros.\n", draws);
         return;
     }
-    printf("  Verified: %u of %u dirty free clusters read as zeros; the drive cleared at least %.1f%% of dirty free "
-           "space (95%% confidence).\n",
-           cleared, ndirty, floor(bound * 1000.0) / 10.0);
+    printf("  Verified: %u of %u sampled leftovers now read as zeros (≥%.1f%% cleared, 95%% confidence).\n", cleared,
+           ndirty, floor(bound * 1000.0) / 10.0);
 }
 
 void report_not_confirmed(uint32_t cleared, uint32_t ndirty)
 {
     fflush(stdout);
     fprintf(stderr,
-            "✗ Trim not confirmed: %u of %u dirty free clusters read as zeros afterwards. "
+            "✗ Trim not confirmed: %u of %u sampled leftovers read as zeros afterwards. "
             "Either the drive ignored TRIM or it does not return zeros for trimmed blocks.\n",
             cleared, ndirty);
 }
