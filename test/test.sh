@@ -21,6 +21,7 @@ STDOUT=""
 STDERR=""
 POLLER=""
 CHECKED_FULL="  Trim checked: the drive cleared what was trimmed."
+TOO_FEW_RE='Trim checked on ([0-9]+) (samples?); too few leftovers to check fully\.'
 CHECKED_ZEROS="  Trim checked: free space already reads as zeros."
 NOT_CONFIRMED="✗ Trim not confirmed: the drive still returns old data. It may ignore TRIM, or keep data until it erases."
 
@@ -61,7 +62,7 @@ line_in() {
 new_volume() {
     local format=$1 size=$2 cluster=$3 image
     IMAGES=$((IMAGES + 1))
-    VOL=EXFT$$N$IMAGES
+    VOL=EXF$$N$IMAGES
     if [ "$format" = RAW ]; then
         image=$WORK/v$IMAGES.dmg
         diskutil image create blank --format RAW --size "$size" "$image" >/dev/null
@@ -116,11 +117,10 @@ raw_sum() {
 }
 
 expect_trim_confirmed() {
-    local re='Trim checked on ([0-9]+) samples?; too few leftovers to check fully\.'
     [ "$RC" -eq 0 ] || fail "$1: exit $RC: $OUT"
     if [[ $OUT == *"$CHECKED_FULL"* ]]; then
         return 0
-    elif [[ $OUT =~ $re ]]; then
+    elif [[ $OUT =~ $TOO_FEW_RE ]]; then
         [ "${BASH_REMATCH[1]}" -ge 1 ] || fail "$1: no sampled leftovers: $OUT"
     else
         fail "$1: the trim was not confirmed: $OUT"
@@ -200,7 +200,7 @@ expect_verify_line() {
 }
 
 verification_cases() {
-    local re='Trim checked on ([0-9]+) (samples?); too few leftovers to check fully\.' arg noun
+    local re arg noun
     new_volume RAW 384m 131072
     mount_volume
     populate 120 3000000 200
@@ -230,13 +230,23 @@ verification_cases() {
     unmount_volume
     run_split "$BIN" -y --verify 99.9 "$DISK"
     [ "$RC" -eq 0 ] || fail "too few leftovers: exit $RC: $OUT"
-    [[ $STDOUT =~ $re ]] || fail "too few leftovers: no 'Trim checked on <n> samples' line on stdout: $OUT"
+    [[ $STDOUT =~ $TOO_FEW_RE ]] || fail "too few leftovers: no 'Trim checked on <n> samples' line on stdout: $OUT"
     [ "${BASH_REMATCH[1]}" -ge 1 ] || fail "too few leftovers: n is ${BASH_REMATCH[1]}: $OUT"
     noun=samples
     [ "${BASH_REMATCH[1]}" -eq 1 ] && noun=sample
     [ "${BASH_REMATCH[2]}" = "$noun" ] || fail "too few leftovers: '${BASH_REMATCH[1]} ${BASH_REMATCH[2]}': $OUT"
     detach_volume
     pass "--verify 99.9 on a 512-cluster image prints the too-few line"
+
+    new_volume RAW 64m 131072
+    python3 -I "$HERE/fill_first_free_cluster.py" "$RAW" >/dev/null
+    run_split "$BIN" -y --verify 99.9 "$DISK"
+    [ "$RC" -eq 0 ] || fail "one leftover cluster: exit $RC: $OUT"
+    [[ $STDOUT == *"Trim checked on 1 sample; too few leftovers to check fully."* ]] \
+        || fail "one leftover cluster: expected the singular line on stdout: $OUT"
+    python3 -I "$HERE/verify_zero.py" "$RAW" || fail "free space not zeroed (one leftover cluster)"
+    detach_volume
+    pass "--verify 99.9 with one leftover cluster prints 'Trim checked on 1 sample'"
 
     new_volume RAW 64m 131072
     python3 -I "$HERE/fill_second_halves.py" "$RAW" >/dev/null
