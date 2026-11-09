@@ -1,6 +1,9 @@
+.POSIX:
+
 CC = clang
-CFLAGS = -O2 -Wall -Wextra -Werror
-PREFIX ?= /usr/local
+CFLAGS = -std=c17 -pedantic -Wall -Wextra -Werror -D_DARWIN_C_SOURCE -O2
+PREFIX = /usr/local
+
 SRC = src/device.c src/exfat.c src/main.c src/report.c src/trim.c src/verify.c src/volume.c src/walk.c
 HDR = src/device.h src/exfat.h src/main.h src/report.h src/trim.h src/verify.h src/volume.h src/walk.h
 

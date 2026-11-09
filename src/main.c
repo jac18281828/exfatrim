@@ -15,7 +15,7 @@
  * Invariant: no byte outside a cluster the bitmap marks free, read on the
  * unmounted volume, is ever unmapped.
  *
- * Build:  make            (clang -O2 -Wall -Wextra -Werror, sources in src/)
+ * Build:  make            (clang, C17 with -pedantic -Werror; sources in src/)
  * Use:    sudo exfatrim                    (the one mounted exFAT volume)
  *         sudo exfatrim "My SSD"           (by name, mount point or diskNsM)
  *         sudo exfatrim -n "My SSD"        (dry run: report only, change nothing)
