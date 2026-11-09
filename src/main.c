@@ -183,6 +183,8 @@ static int remount(const struct trim_result* trim) {
 
 int main(int argc, char** argv) {
   g_volume.prog = argv[0];
+  g_volume.argc = argc;
+  g_volume.argv = argv;
   struct options o;
   if (parse_options(argc, argv, &o) != 0) {
     report_usage(g_volume.prog);
@@ -199,7 +201,7 @@ int main(int argc, char** argv) {
   snprintf(raw, sizeof raw, "/dev/r%s", g_volume.bsd);
   snprintf(dev, sizeof dev, "/dev/%s", g_volume.bsd);
 
-  volume_require_access(raw, o.dry, o.arg, o.verify);
+  volume_require_access(raw, o.dry);
   confirm_first_trim(&o);
   volume_read_free_space();
   volume_install_signals();

@@ -6,9 +6,9 @@ PREFIX = /usr/local
 CLANG_FORMAT = clang-format
 FORMAT_VERSION = 22.1.8
 
-SRC = src/device.c src/exfat.c src/main.c src/report.c src/trim.c src/verify.c src/volume.c src/walk.c
-UNIT_SRC = src/device.c src/exfat.c src/verify.c src/walk.c
-HDR = src/device.h src/exfat.h src/report.h src/trim.h src/verify.h src/volume.h src/walk.h
+SRC = src/device.c src/exfat.c src/main.c src/report.c src/shell.c src/trim.c src/verify.c src/volume.c src/walk.c
+UNIT_SRC = src/device.c src/exfat.c src/shell.c src/verify.c src/walk.c
+HDR = src/device.h src/exfat.h src/report.h src/shell.h src/trim.h src/verify.h src/volume.h src/walk.h
 FORMAT_FILES = $(SRC) $(HDR) test/unit.c
 
 all: exfatrim
@@ -16,7 +16,7 @@ all: exfatrim
 exfatrim: $(SRC) $(HDR)
 	$(CC) $(CFLAGS) $(SRC) -o $@
 
-test/unit: test/unit.c $(UNIT_SRC) src/device.h src/exfat.h src/verify.h src/walk.h
+test/unit: test/unit.c $(UNIT_SRC) src/device.h src/exfat.h src/shell.h src/verify.h src/walk.h
 	$(CC) $(CFLAGS) test/unit.c $(UNIT_SRC) -o $@
 
 test: test/unit

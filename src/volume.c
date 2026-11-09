@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "report.h"
+#include "shell.h"
 #include "volume.h"
 
 extern char** environ;
@@ -182,14 +183,18 @@ static int still_mounted(void) {
   return 0;
 }
 
-void volume_require_access(const char* raw, int dry, const char* arg, int verify) {
+static const char* command_as_typed(void) {
+  char* line = shell_join(g_volume.argc, g_volume.argv);
+  return line ? line : g_volume.prog;
+}
+
+void volume_require_access(const char* raw, int dry) {
   int open_errno = 0;
   switch (device_probe(raw, dry, &open_errno)) {
   case DEVICE_PROBE_OK:
     return;
   case DEVICE_PROBE_NEEDS_ADMIN:
-    die("Needs administrator rights. Run:  sudo %s%s%s%s%s%s", g_volume.prog, dry ? " -n" : "", verify ? " -v" : "",
-        arg ? " \"" : "", arg ? arg : "", arg ? "\"" : "");
+    die("Needs administrator rights. Run:  sudo %s", command_as_typed());
   case DEVICE_PROBE_BUSY:
     die("Another process holds %s, so exfatrim can't lock it. Nothing changed.", raw);
   case DEVICE_PROBE_OPEN_FAILED:

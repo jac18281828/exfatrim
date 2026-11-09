@@ -13,6 +13,8 @@
 
 struct volume {
   const char* prog;
+  int argc;
+  char* const* argv;
   char name[256];
   char bsd[64];
   char where[1100];
@@ -29,7 +31,7 @@ void die(const char* fmt, ...) __attribute__((format(printf, 1, 2), noreturn));
 
 void volume_resolve(const char* arg);
 void volume_read_free_space(void);
-void volume_require_access(const char* raw, int dry, const char* arg, int verify);
+void volume_require_access(const char* raw, int dry);
 void volume_install_signals(void);
 void volume_unmount(const char* dev);
 void volume_check_filesystem(const char* raw);

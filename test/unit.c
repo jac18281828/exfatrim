@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../src/exfat.h"
+#include "../src/shell.h"
 #include "../src/verify.h"
 #include "../src/walk.h"
 
@@ -594,6 +595,47 @@ static void test_confidence_argument(void) {
   CHECK(verify_parse_confidence("99.9", &pct) == 0 && pct == 99.9);
 }
 
+static void expect_joined(int argc, char* const* argv, const char* want) {
+  char* got = shell_join(argc, argv);
+  CHECK(got != NULL);
+  if (got) {
+    if (strcmp(got, want))
+      fprintf(stderr, "  shell_join: got [%s], want [%s]\n", got, want);
+    CHECK(!strcmp(got, want));
+  }
+  free(got);
+}
+
+static void test_shell_bare_arguments_stay_bare(void) {
+  char* argv[] = {"./exfatrim", "-v", "/dev/disk4", "a_b.c/d:e=f@g%h+i,j-k"};
+  expect_joined(4, argv, "./exfatrim -v /dev/disk4 a_b.c/d:e=f@g%h+i,j-k");
+}
+
+static void test_shell_quotes_a_space(void) {
+  char* argv[] = {"exfatrim", "X9 Pro"};
+  expect_joined(2, argv, "exfatrim 'X9 Pro'");
+}
+
+static void test_shell_escapes_an_embedded_quote(void) {
+  char* argv[] = {"exfatrim", "it's"};
+  expect_joined(2, argv, "exfatrim 'it'\\''s'");
+}
+
+static void test_shell_quotes_an_empty_string(void) {
+  char* argv[] = {"exfatrim", ""};
+  expect_joined(2, argv, "exfatrim ''");
+}
+
+static void test_shell_quotes_metacharacters(void) {
+  char* argv[] = {"exfatrim", "$HOME", "a\"b", "x;y", "~"};
+  expect_joined(5, argv, "exfatrim '$HOME' 'a\"b' 'x;y' '~'");
+}
+
+static void test_shell_keeps_options_as_typed(void) {
+  char* argv[] = {"./exfatrim", "--verify", "99", "-y", "X9 Pro"};
+  expect_joined(5, argv, "./exfatrim --verify 99 -y 'X9 Pro'");
+}
+
 static void finish(const char* name) {
   g_tests++;
   if (g_failed)
@@ -633,6 +675,12 @@ int main(void) {
   RUN(test_free_space_cross_check);
   RUN(test_sample_size_follows_confidence);
   RUN(test_confidence_argument);
+  RUN(test_shell_bare_arguments_stay_bare);
+  RUN(test_shell_quotes_a_space);
+  RUN(test_shell_escapes_an_embedded_quote);
+  RUN(test_shell_quotes_an_empty_string);
+  RUN(test_shell_quotes_metacharacters);
+  RUN(test_shell_keeps_options_as_typed);
   printf("UNIT %s: %d tests, %d failed\n", g_tests_failed ? "FAIL" : "PASS", g_tests, g_tests_failed);
   return g_tests_failed ? 1 : 0;
 }
