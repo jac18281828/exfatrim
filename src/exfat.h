@@ -74,9 +74,9 @@ enum exfat_status exfat_load(const struct exfat_source* src, int allow_dirty, st
 
 void exfat_release(struct exfat_volume* v);
 
-int exfat_valid_cluster(const struct exfat_fs* f, uint32_t c);
 uint64_t exfat_cluster_offset(const struct exfat_fs* f, uint32_t c);
 int exfat_cluster_allocated(const uint8_t* bitmap, uint32_t c);
 int exfat_index_free(const uint8_t* bitmap, uint32_t index);
+int exfat_free_matches(const struct exfat_volume* v, uint64_t reported_free_bytes);
 
 #endif

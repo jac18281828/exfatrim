@@ -239,6 +239,6 @@ enum report_confirm report_confirm_first_trim(const char* where) {
 
   if (!have_path || write_marker(path) != 0)
     fprintf(stderr, "Couldn't record the confirmation (%s); the notice will show again next run.\n",
-            have_path ? strerror(errno) : "no user name");
+            have_path ? strerror(errno) : "no usable user name");
   return REPORT_CONFIRM_YES;
 }

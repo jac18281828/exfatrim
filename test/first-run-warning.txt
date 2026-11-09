@@ -1,0 +1,7 @@
+exfatrim clears the deleted files on /Volumes/SSD.
+Your files and folders will not be changed.  After a trim undelete or recovery
+tools will no longer bring back any deleted file.
+
+If you are trying to recover deleted files from this volume STOP HERE.
+
+Continue? [y/N]

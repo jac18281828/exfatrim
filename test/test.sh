@@ -356,7 +356,7 @@ pty_run() {
 }
 
 confirmation_cases() {
-    local lecture=$WORK/lecture/nested/deeper user=sudoer$$ me
+    local lecture=$WORK/lecture/nested/deeper user=sudoer$$ me notice
     me=$(id -un)
     new_volume RAW 128m 4096
     mount_volume
@@ -364,8 +364,8 @@ confirmation_cases() {
 
     pty_run n "$lecture" "$user" "$BIN" -v "$VOL"
     [ "$RC" -eq 1 ] || fail "answer n: expected exit 1, got $RC: $OUT"
-    [[ $OUT == *"exfatrim clears the deleted files on $MP."* ]] || fail "notice names the mount point: $OUT"
-    [[ $OUT == *"Continue? [y/N]"* ]] || fail "no prompt: $OUT"
+    notice=$(sed "s|/Volumes/SSD|$MP|" "$HERE/first-run-warning.txt")
+    [[ $OUT == "$notice"* ]] || fail "the notice differs from test/first-run-warning.txt: $OUT"
     expect_mounted "answer n"
     check_sums "answer n"
     [ ! -e "$lecture" ] || fail "answer n wrote a marker"

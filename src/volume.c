@@ -10,7 +10,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "main.h"
 #include "report.h"
 #include "volume.h"
 
@@ -104,12 +103,17 @@ static void adopt_mount(const struct statfs* m) {
   snprintf(g_volume.bsd, sizeof g_volume.bsd, "%s", strip_from(m->f_mntfromname));
   snprintf(g_volume.name, sizeof g_volume.name, "%s", strrchr(m->f_mntonname, '/') + 1);
   snprintf(g_volume.where, sizeof g_volume.where, "%s", m->f_mntonname);
+  g_volume.mounted = 1;
+}
+
+void volume_read_free_space(void) {
+  if (!g_volume.mounted)
+    return;
   struct statfs st;
   sync();
-  if (statfs(m->f_mntonname, &st) < 0)
+  if (statfs(g_volume.where, &st) < 0)
     die("Can't read free space on %s: %s", g_volume.name, strerror(errno));
   g_volume.df_free = (uint64_t)st.f_bavail * st.f_bsize;
-  g_volume.mounted = 1;
 }
 
 void volume_resolve(const char* arg) {

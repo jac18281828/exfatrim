@@ -551,6 +551,25 @@ static void test_walk_over_a_parsed_volume(void) {
   free(img);
 }
 
+static void test_free_space_cross_check(void) {
+  uint8_t* img = build_image();
+  struct loaded l;
+  load(img, 0, &l);
+  REQUIRE(l.status == EXFAT_OK);
+  uint64_t free_bytes = l.v.free_bytes;
+  uint64_t bound = l.v.total_bytes / 100;
+  CHECK(bound > 0);
+  CHECK(exfat_free_matches(&l.v, free_bytes));
+  CHECK(exfat_free_matches(&l.v, free_bytes + bound));
+  CHECK(exfat_free_matches(&l.v, free_bytes - bound));
+  CHECK(!exfat_free_matches(&l.v, free_bytes + bound + 1));
+  CHECK(!exfat_free_matches(&l.v, free_bytes - bound - 1));
+  CHECK(!exfat_free_matches(&l.v, 0));
+  CHECK(!exfat_free_matches(&l.v, l.v.total_bytes * 2));
+  exfat_release(&l.v);
+  free(img);
+}
+
 static void test_sample_size_follows_confidence(void) {
   CHECK(verify_sample_size(50.0) == 69);
   CHECK(verify_sample_size(60.0) == 92);
@@ -611,6 +630,7 @@ int main(void) {
   RUN(test_walk_population_prefix);
   RUN(test_walk_zero_alignment);
   RUN(test_walk_over_a_parsed_volume);
+  RUN(test_free_space_cross_check);
   RUN(test_sample_size_follows_confidence);
   RUN(test_confidence_argument);
   printf("UNIT %s: %d tests, %d failed\n", g_tests_failed ? "FAIL" : "PASS", g_tests, g_tests_failed);

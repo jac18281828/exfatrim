@@ -39,7 +39,7 @@ static enum exfat_status rd(const struct loader* l, uint64_t off, void* dst, siz
   return EXFAT_OK;
 }
 
-int exfat_valid_cluster(const struct exfat_fs* f, uint32_t c) { return c >= 2 && c - 2 < f->nclus; }
+static int exfat_valid_cluster(const struct exfat_fs* f, uint32_t c) { return c >= 2 && c - 2 < f->nclus; }
 
 uint64_t exfat_cluster_offset(const struct exfat_fs* f, uint32_t c) {
   return f->heap_off + (uint64_t)(c - 2) * f->clus;
@@ -334,6 +334,12 @@ enum exfat_status exfat_load(const struct exfat_source* src, int allow_dirty, st
   if (st != EXFAT_OK)
     exfat_release(v);
   return st;
+}
+
+int exfat_free_matches(const struct exfat_volume* v, uint64_t reported_free_bytes) {
+  uint64_t diff =
+      v->free_bytes > reported_free_bytes ? v->free_bytes - reported_free_bytes : reported_free_bytes - v->free_bytes;
+  return diff <= v->total_bytes / 100;
 }
 
 void exfat_release(struct exfat_volume* v) {

@@ -45,7 +45,6 @@
 
 #include "device.h"
 #include "exfat.h"
-#include "main.h"
 #include "report.h"
 #include "trim.h"
 #include "verify.h"
@@ -72,6 +71,58 @@ static void on_sample_progress(void* ctx, uint32_t draws) {
   report_status("Sampling %s… %u clusters", g_volume.name, draws);
 }
 
+struct options {
+  int dry;
+  int verify;
+  int yes;
+  double confidence;
+  const char* arg;
+};
+
+static int parse_options(int argc, char** argv, struct options* o) {
+  static const struct option longopts[] = {{"verify", required_argument, NULL, 'V'}, {NULL, 0, NULL, 0}};
+  int opt;
+  *o = (struct options){.confidence = VERIFY_CONFIDENCE_DEFAULT};
+  while ((opt = getopt_long(argc, argv, "nvyh", longopts, NULL)) != -1) {
+    if (opt == 'n') {
+      o->dry = 1;
+    } else if (opt == 'v') {
+      o->verify = 1;
+    } else if (opt == 'V') {
+      o->verify = 1;
+      if (verify_parse_confidence(optarg, &o->confidence) != 0)
+        return -1;
+    } else if (opt == 'y') {
+      o->yes = 1;
+    } else {
+      return -1;
+    }
+  }
+  if (argc - optind > 1)
+    return -1;
+  o->arg = optind < argc ? argv[optind] : NULL;
+  return 0;
+}
+
+static void die_verify(enum verify_status vs, const struct device* d, const struct trim_result* t) {
+  if (vs == VERIFY_E_NOMEM)
+    die("Out of memory.");
+  if (vs == VERIFY_E_STOPPED)
+    die("Stopped.%s", nothing_trimmed(t));
+  if (vs == VERIFY_E_READ)
+    die_read(d, t);
+}
+
+static void confirm_first_trim(const struct options* o) {
+  if (o->dry || o->yes)
+    return;
+  enum report_confirm answer = report_confirm_first_trim(g_volume.where);
+  if (answer == REPORT_CONFIRM_NO)
+    die("Cancelled. Nothing changed.");
+  if (answer == REPORT_CONFIRM_NO_TTY)
+    die("The first trim asks for confirmation. Run exfatrim in a terminal, or pass -y.");
+}
+
 static void load_volume(struct device* device, struct exfat_volume* v, int dry, const struct trim_result* trim) {
   struct exfat_source src = {device_read, device, device->size, g_volume.name};
   char reason[256];
@@ -81,68 +132,79 @@ static void load_volume(struct device* device, struct exfat_volume* v, int dry, 
   if (st != EXFAT_OK)
     die("%s", reason);
 
-  if (g_volume.mounted) {
+  if (g_volume.mounted && !exfat_free_matches(v, g_volume.df_free)) {
     char h1[32], h2[32];
-    uint64_t df = g_volume.df_free;
-    uint64_t diff = v->free_bytes > df ? v->free_bytes - df : df - v->free_bytes;
-    if (diff > v->total_bytes / 100)
-      die("Safety check failed: the bitmap shows %s free but macOS reported %s. Nothing was trimmed.",
-          report_human(v->free_bytes, h1, sizeof h1), report_human(df, h2, sizeof h2));
+    die("Safety check failed: the bitmap shows %s free but macOS reported %s. Nothing was trimmed.",
+        report_human(v->free_bytes, h1, sizeof h1), report_human(g_volume.df_free, h2, sizeof h2));
   }
+}
+
+static void sample_leftovers(struct device* device, const struct exfat_volume* v, const struct walk_plan* plan,
+                             uint32_t target, struct verify_sample* sample, const struct trim_result* trim) {
+  die_verify(verify_draw(device, &v->fs, plan, target, &g_stop, on_sample_progress, NULL, sample), device, trim);
+}
+
+static void trim_free_space(struct device* device, const struct walk_plan* plan, struct trim_result* trim) {
+  enum trim_status ts = trim_runs(device, plan, &g_stop, on_trim_progress, NULL, trim);
+  char h[32];
+  if (ts == TRIM_E_MOUNTED)
+    die("%s was mounted while exfatrim ran, so macOS refused the TRIM. Your files are untouched.", g_volume.name);
+  if (ts == TRIM_E_REJECTED)
+    die("The drive rejected TRIM (%s) after %s. Your files are untouched.", strerror(trim->err_no),
+        report_human(trim->trimmed, h, sizeof h));
+}
+
+static uint32_t count_cleared(struct device* device, const struct exfat_volume* v, const struct verify_sample* sample,
+                              const struct trim_result* trim) {
+  uint32_t cleared = 0;
+  report_status("Verifying %s…", g_volume.name);
+  die_verify(verify_count_cleared(device, &v->fs, sample, &cleared), device, trim);
+  return cleared;
+}
+
+static void die_if_stopped(int dry, const struct trim_result* trim) {
+  char h[32];
+  if (g_stop && dry)
+    die("Stopped. Nothing changed.");
+  if (g_stop)
+    die("Stopped part-way; %s was trimmed. Your files are untouched.", report_human(trim->trimmed, h, sizeof h));
+}
+
+static int remount(const struct trim_result* trim) {
+  report_status("Mounting %s…", g_volume.name);
+  volume_remount();
+  if (g_volume.owe_remount) {
+    report_clear_status();
+    report_not_remounted(g_volume.name, g_volume.bsd, trim->trimmed);
+    return EXIT_NOT_REMOUNTED;
+  }
+  return 0;
 }
 
 int main(int argc, char** argv) {
   g_volume.prog = argv[0];
-  int dry = 0, verify = 0, yes = 0, opt;
-  double confidence = VERIFY_CONFIDENCE_DEFAULT;
-  static const struct option longopts[] = {{"verify", required_argument, NULL, 'V'}, {NULL, 0, NULL, 0}};
-  while ((opt = getopt_long(argc, argv, "nvyh", longopts, NULL)) != -1) {
-    if (opt == 'n') {
-      dry = 1;
-    } else if (opt == 'v') {
-      verify = 1;
-    } else if (opt == 'V') {
-      verify = 1;
-      if (verify_parse_confidence(optarg, &confidence) != 0) {
-        report_usage(g_volume.prog);
-        return EXIT_USAGE;
-      }
-    } else if (opt == 'y') {
-      yes = 1;
-    } else {
-      report_usage(g_volume.prog);
-      return EXIT_USAGE;
-    }
-  }
-  if (argc - optind > 1) {
+  struct options o;
+  if (parse_options(argc, argv, &o) != 0) {
     report_usage(g_volume.prog);
     return EXIT_USAGE;
   }
-  const char* arg = optind < argc ? argv[optind] : NULL;
 
   report_init(isatty(2));
   struct timespec t0;
   clock_gettime(CLOCK_MONOTONIC, &t0);
 
-  volume_resolve(arg);
+  volume_resolve(o.arg);
 
   char raw[80], dev[80];
   snprintf(raw, sizeof raw, "/dev/r%s", g_volume.bsd);
   snprintf(dev, sizeof dev, "/dev/%s", g_volume.bsd);
 
-  volume_require_access(raw, dry, arg, verify);
-
-  if (!dry && !yes) {
-    enum report_confirm answer = report_confirm_first_trim(g_volume.where);
-    if (answer == REPORT_CONFIRM_NO)
-      die("Cancelled. Nothing changed.");
-    if (answer == REPORT_CONFIRM_NO_TTY)
-      die("The first trim asks for confirmation. Run exfatrim in a terminal, or pass -y.");
-  }
-
+  volume_require_access(raw, o.dry, o.arg, o.verify);
+  confirm_first_trim(&o);
+  volume_read_free_space();
   volume_install_signals();
 
-  if (!dry) {
+  if (!o.dry) {
     if (g_volume.mounted)
       volume_unmount(dev);
     volume_check_filesystem(raw);
@@ -151,13 +213,13 @@ int main(int argc, char** argv) {
   struct device device = {.fd = -1};
   g_volume.device = &device;
   char err[256];
-  if (device_open(&device, raw, dry, g_volume.name, err, sizeof err) != 0)
+  if (device_open(&device, raw, o.dry, g_volume.name, err, sizeof err) != 0)
     die("%s", err);
   report_status("Reading %s…", g_volume.name);
 
   struct trim_result trim = {0};
   struct exfat_volume v;
-  load_volume(&device, &v, dry, &trim);
+  load_volume(&device, &v, o.dry, &trim);
   if (!g_volume.mounted && v.meta.label[0])
     snprintf(g_volume.name, sizeof g_volume.name, "%s", v.meta.label);
 
@@ -166,65 +228,34 @@ int main(int argc, char** argv) {
   if (walk_runs(&v.fs, v.bitmap, device.align, &plan, reason, sizeof reason) != WALK_OK)
     die("%s", reason);
 
-  uint32_t target = verify_sample_size(confidence);
+  uint32_t target = verify_sample_size(o.confidence);
   struct verify_sample sample;
   memset(&sample, 0, sizeof sample);
-  if (verify) {
-    enum verify_status vs = verify_draw(&device, &v.fs, &plan, target, &g_stop, on_sample_progress, NULL, &sample);
-    if (vs == VERIFY_E_NOMEM)
-      die("Out of memory.");
-    if (vs == VERIFY_E_STOPPED)
-      die("Stopped.%s", nothing_trimmed(&trim));
-    if (vs == VERIFY_E_READ)
-      die_read(&device, &trim);
-  }
-
-  if (!dry) {
-    enum trim_status ts = trim_runs(&device, &plan, &g_stop, on_trim_progress, NULL, &trim);
-    char h[32];
-    if (ts == TRIM_E_MOUNTED)
-      die("%s was mounted while exfatrim ran, so macOS refused the TRIM. Your files are untouched.", g_volume.name);
-    if (ts == TRIM_E_REJECTED)
-      die("The drive rejected TRIM (%s) after %s. Your files are untouched.", strerror(trim.err_no),
-          report_human(trim.trimmed, h, sizeof h));
-  }
-
+  if (o.verify)
+    sample_leftovers(&device, &v, &plan, target, &sample, &trim);
+  if (!o.dry)
+    trim_free_space(&device, &plan, &trim);
   uint32_t cleared = 0;
-  if (!dry && verify && !g_stop) {
-    report_status("Verifying %s…", g_volume.name);
-    enum verify_status vs = verify_count_cleared(&device, &v.fs, &sample, &cleared);
-    if (vs == VERIFY_E_NOMEM)
-      die("Out of memory.");
-    if (vs == VERIFY_E_READ)
-      die_read(&device, &trim);
-  }
+  if (!o.dry && o.verify && !g_stop)
+    cleared = count_cleared(&device, &v, &sample, &trim);
   device_close(&device);
+  die_if_stopped(o.dry, &trim);
 
-  char h1[32];
-  if (g_stop && dry)
-    die("Stopped. Nothing changed.");
-  if (g_stop)
-    die("Stopped part-way; %s was trimmed. Your files are untouched.", report_human(trim.trimmed, h1, sizeof h1));
-
-  if (!dry) {
-    report_status("Mounting %s…", g_volume.name);
-    volume_remount();
-    if (g_volume.owe_remount) {
-      report_clear_status();
-      report_not_remounted(g_volume.name, g_volume.bsd, trim.trimmed);
-      return EXIT_NOT_REMOUNTED;
-    }
+  if (!o.dry) {
+    int rc = remount(&trim);
+    if (rc)
+      return rc;
   }
   report_clear_status();
 
-  if (dry) {
+  if (o.dry) {
     report_dry_run(g_volume.name, plan.bytes, plan.n, v.free_bytes, v.total_bytes);
-    if (verify)
+    if (o.verify)
       report_dry_sample(sample.ndirty, sample.draws);
     return 0;
   }
   report_trimmed(g_volume.name, trim.trimmed, &t0, v.free_bytes, v.total_bytes, g_volume.mounted);
-  if (!verify)
+  if (!o.verify)
     return 0;
   if (cleared != sample.ndirty) {
     report_not_confirmed();

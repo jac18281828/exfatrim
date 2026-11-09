@@ -189,10 +189,10 @@ leftovers.
 
 | Code | Meaning |
 |---|---|
-| 0 | Success. With `-v`, every dirty sample read as zeros, or no dirty sample existed. |
+| 0 | Success. With `-v`, every sampled leftover read as zeros, or no leftover was sampled. |
 | 1 | Refused or error, including a first-run confirmation that was declined. |
 | 2 | Usage error. |
-| 3 | `-v` only. At least one dirty sample still holds leftovers; the trim is not confirmed. |
+| 3 | `-v` only. At least one sampled leftover still holds data; the trim is not confirmed. |
 | 4 | `exfatrim` unmounted the volume and could not mount it again. Run `diskutil mount <disk id>` or replug the drive. Code 4 takes precedence over 1 and 3. |
 
 ## How `-v` works
@@ -252,14 +252,14 @@ they gave it, and detach them on exit.
 
 - RAW images (`diskutil image create blank --format RAW`) read unmapped blocks
   as zeros, like a drive that honours TRIM. A `-v` run on one must exit 0 with
-  at least one dirty sample, all cleared.
+  at least one sampled leftover, all cleared.
 - SPARSE images (`hdiutil create -type SPARSE`) accept `DKIOCUNMAP` and keep
   the data, like a drive that ignores TRIM. A `-v` run on one must exit 3.
 - Per cluster size (4 KB, 32 KB and 128 KB): live files stay byte-identical,
   `fsck_exfat -n` is clean and every free cluster is zero after a trim of the
   unmounted volume.
 - A second `-v` run right after a trim of the unmounted volume reports no
-  dirty sample. A dry run changes no byte of the device.
+  sampled leftover. A dry run changes no byte of the device.
 - Volume name, mount point and disk id (with and without `/dev/` and
   `/dev/r`) all resolve.
 - Corrupted volumes are refused with the volume bytes unchanged: a bitmap bit
