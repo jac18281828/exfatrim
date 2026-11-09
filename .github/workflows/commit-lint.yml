@@ -7,6 +7,8 @@ on:
       - main
   push:
     branches: ["**"]
+permissions:
+  contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,17 +16,18 @@ jobs:
   commitlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.16.0
       - name: Install dependencies
-        run: npm install -g @commitlint/{cli,config-conventional}
-      # On a pull request, validate every commit the PR contributes. On a
-      # bare push the PR commit count is absent. A push to main is a
+        run: npm install -g @commitlint/cli@21.2.4 @commitlint/config-conventional@21.2.4
+      # On a pull request, validate the commits between the base and head SHAs
+      # the event reports: checkout builds a synthetic merge commit, so counting
+      # back from HEAD would walk the base branch instead. A push to main is a
       # fast-forward, so the range the push reported is exactly the landed
       # commits; fall back to the tip commit when `before` is unavailable
       # (all zeros). A push to any other branch cannot trust `before`: a
@@ -39,10 +42,13 @@ jobs:
         env:
           REF_NAME: ${{ github.ref_name }}
           BEFORE: ${{ github.event.before }}
-          PR_COMMITS: ${{ github.event.pull_request.commits }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ -n "$PR_COMMITS" ]; then
-            from="HEAD~${PR_COMMITS}"
+          to=HEAD
+          if [ -n "$HEAD_SHA" ]; then
+            from="$BASE_SHA"
+            to="$HEAD_SHA"
           elif [ "$REF_NAME" = "main" ]; then
             if git rev-parse --verify --quiet "${BEFORE}^{commit}" > /dev/null; then
               from="$BEFORE"
@@ -52,8 +58,8 @@ jobs:
           else
             from="$(git merge-base origin/main HEAD)" || from="HEAD~1"
           fi
-          if [ "$(git rev-parse "$from")" = "$(git rev-parse HEAD)" ]; then
-            echo "No commits to lint: HEAD adds nothing to origin/main."
+          if [ "$(git rev-parse "$from")" = "$(git rev-parse "$to")" ]; then
+            echo "No commits to lint: $to adds nothing to origin/main."
             exit 0
           fi
-          npx commitlint --from "$from" --to HEAD --verbose
+          npx commitlint --from "$from" --to "$to" --verbose
