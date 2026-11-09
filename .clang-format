@@ -1,0 +1,20 @@
+---
+# LLVM-based style at 120 columns, applied by clang-format 22.1.8.
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 120
+DerivePointerAlignment: false
+PointerAlignment: Left
+AlignEscapedNewlines: Left
+BreakStringLiterals: false
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # 1. System: every angle-bracket header.
+  - Regex: '^<.*>$'
+    Priority: 1
+  # 2. Project: every quoted include.
+  - Regex: '^".*"$'
+    Priority: 2
+IncludeIsMainRegex: '$^'
