@@ -35,6 +35,7 @@
  * real uid's name). -y skips the notice and writes no marker; -n never asks.
  */
 
+#include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,11 +94,19 @@ static void load_volume(struct device* device, struct exfat_volume* v, int dry, 
 int main(int argc, char** argv) {
   g_volume.prog = argv[0];
   int dry = 0, verify = 0, yes = 0, opt;
-  while ((opt = getopt(argc, argv, "nvyh")) != -1) {
+  double confidence = VERIFY_CONFIDENCE_DEFAULT;
+  static const struct option longopts[] = {{"verify", required_argument, NULL, 'V'}, {NULL, 0, NULL, 0}};
+  while ((opt = getopt_long(argc, argv, "nvyh", longopts, NULL)) != -1) {
     if (opt == 'n') {
       dry = 1;
     } else if (opt == 'v') {
       verify = 1;
+    } else if (opt == 'V') {
+      verify = 1;
+      if (verify_parse_confidence(optarg, &confidence) != 0) {
+        report_usage(g_volume.prog);
+        return EXIT_USAGE;
+      }
     } else if (opt == 'y') {
       yes = 1;
     } else {
@@ -157,10 +166,11 @@ int main(int argc, char** argv) {
   if (walk_runs(&v.fs, v.bitmap, device.align, &plan, reason, sizeof reason) != WALK_OK)
     die("%s", reason);
 
+  uint32_t target = verify_sample_size(confidence);
   struct verify_sample sample;
   memset(&sample, 0, sizeof sample);
   if (verify) {
-    enum verify_status vs = verify_draw(&device, &v.fs, &plan, &g_stop, on_sample_progress, NULL, &sample);
+    enum verify_status vs = verify_draw(&device, &v.fs, &plan, target, &g_stop, on_sample_progress, NULL, &sample);
     if (vs == VERIFY_E_NOMEM)
       die("Out of memory.");
     if (vs == VERIFY_E_STOPPED)
@@ -217,9 +227,9 @@ int main(int argc, char** argv) {
   if (!verify)
     return 0;
   if (cleared != sample.ndirty) {
-    report_not_confirmed(cleared, sample.ndirty);
+    report_not_confirmed();
     return EXIT_UNCONFIRMED;
   }
-  report_verified(sample.draws, sample.ndirty, cleared, sample.ndirty ? verify_bound(sample.ndirty) : 0.0);
+  report_verified(sample.draws, sample.ndirty, target);
   return 0;
 }

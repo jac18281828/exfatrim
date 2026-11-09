@@ -5,9 +5,9 @@
 #include "verify.h"
 
 #define SAMPLE_MAX_DRAWS 3000
-#define SAMPLE_READ_BYTES (1u << 20)
+#define SAMPLE_READ_BYTES (128u << 10)
 #define SEEN_SLOTS 8192
-#define CONFIDENCE_TAIL 0.05
+#define COVERAGE 0.99
 
 static int claim(uint32_t* seen, uint32_t rank) {
   uint32_t h = (rank * 2654435761u) >> 19;
@@ -46,10 +46,12 @@ static enum verify_status cluster_is_zero(struct device* d, const struct exfat_f
   return VERIFY_OK;
 }
 
-enum verify_status verify_draw(struct device* d, const struct exfat_fs* f, const struct walk_plan* p,
+enum verify_status verify_draw(struct device* d, const struct exfat_fs* f, const struct walk_plan* p, uint32_t target,
                                const volatile sig_atomic_t* stop, verify_progress_fn progress, void* progress_ctx,
                                struct verify_sample* s) {
   memset(s, 0, sizeof *s);
+  if (target > VERIFY_SAMPLE_MAX)
+    target = VERIFY_SAMPLE_MAX;
   if (p->population == 0)
     return VERIFY_OK;
   uint64_t limit = p->population < SAMPLE_MAX_DRAWS ? p->population : SAMPLE_MAX_DRAWS;
@@ -58,7 +60,7 @@ enum verify_status verify_draw(struct device* d, const struct exfat_fs* f, const
   enum verify_status st = VERIFY_OK;
   if (!seen || !buf)
     st = VERIFY_E_NOMEM;
-  while (st == VERIFY_OK && s->ndirty < VERIFY_SAMPLE_TARGET && s->draws < limit) {
+  while (st == VERIFY_OK && s->ndirty < target && s->draws < limit) {
     if (*stop) {
       st = VERIFY_E_STOPPED;
       break;
@@ -99,4 +101,25 @@ enum verify_status verify_count_cleared(struct device* d, const struct exfat_fs*
   return st;
 }
 
-double verify_bound(uint32_t n) { return pow(CONFIDENCE_TAIL, 1.0 / (double)n); }
+uint32_t verify_sample_size(double confidence_pct) {
+  return (uint32_t)ceil(log((100.0 - confidence_pct) / 100.0) / log(COVERAGE));
+}
+
+int verify_parse_confidence(const char* text, double* confidence_pct) {
+  size_t digits = 0, dots = 0;
+  for (const char* c = text; *c; c++) {
+    if (*c >= '0' && *c <= '9')
+      digits++;
+    else if (*c == '.')
+      dots++;
+    else
+      return -1;
+  }
+  if (digits == 0 || dots > 1)
+    return -1;
+  double v = strtod(text, NULL);
+  if (v < VERIFY_CONFIDENCE_MIN || v > VERIFY_CONFIDENCE_MAX)
+    return -1;
+  *confidence_pct = v;
+  return 0;
+}

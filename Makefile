@@ -7,7 +7,7 @@ CLANG_FORMAT = clang-format
 FORMAT_VERSION = 22.1.8
 
 SRC = src/device.c src/exfat.c src/main.c src/report.c src/trim.c src/verify.c src/volume.c src/walk.c
-UNIT_SRC = src/exfat.c src/walk.c
+UNIT_SRC = src/device.c src/exfat.c src/verify.c src/walk.c
 HDR = src/device.h src/exfat.h src/main.h src/report.h src/trim.h src/verify.h src/volume.h src/walk.h
 FORMAT_FILES = $(SRC) $(HDR) test/unit.c
 

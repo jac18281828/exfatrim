@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../src/exfat.h"
+#include "../src/verify.h"
 #include "../src/walk.h"
 
 #define BPS 512
@@ -550,6 +551,30 @@ static void test_walk_over_a_parsed_volume(void) {
   free(img);
 }
 
+static void test_sample_size_follows_confidence(void) {
+  CHECK(verify_sample_size(50.0) == 69);
+  CHECK(verify_sample_size(60.0) == 92);
+  CHECK(verify_sample_size(VERIFY_CONFIDENCE_DEFAULT) == 299);
+  CHECK(verify_sample_size(99.0) == 459);
+  CHECK(verify_sample_size(VERIFY_CONFIDENCE_MAX) == 688);
+  CHECK(verify_sample_size(VERIFY_CONFIDENCE_MAX) == VERIFY_SAMPLE_MAX);
+}
+
+static void test_confidence_argument(void) {
+  static const char* const good[] = {"50", "50.0", "60", "95", "99", "99.9", "99.90", "75.5"};
+  static const char* const bad[] = {"",    "49.9", "49",  "100", "99.91", "99.95", "0",  "abc", "99x", "-60", "+60",
+                                    "1e2", "0x60", " 99", "99 ", ".",     "9.9.",  "..", "inf", "nan", "9,9", "99.9.9"};
+  double pct = 0;
+  for (size_t i = 0; i < sizeof good / sizeof good[0]; i++) {
+    pct = 0;
+    CHECK(verify_parse_confidence(good[i], &pct) == 0);
+    CHECK(pct >= VERIFY_CONFIDENCE_MIN && pct <= VERIFY_CONFIDENCE_MAX);
+  }
+  for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++)
+    CHECK(verify_parse_confidence(bad[i], &pct) != 0);
+  CHECK(verify_parse_confidence("99.9", &pct) == 0 && pct == 99.9);
+}
+
 static void finish(const char* name) {
   g_tests++;
   if (g_failed)
@@ -586,6 +611,8 @@ int main(void) {
   RUN(test_walk_population_prefix);
   RUN(test_walk_zero_alignment);
   RUN(test_walk_over_a_parsed_volume);
+  RUN(test_sample_size_follows_confidence);
+  RUN(test_confidence_argument);
   printf("UNIT %s: %d tests, %d failed\n", g_tests_failed ? "FAIL" : "PASS", g_tests, g_tests_failed);
   return g_tests_failed ? 1 : 0;
 }

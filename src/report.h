@@ -25,8 +25,8 @@ void report_dry_run(const char* name, uint64_t would_trim, uint64_t ranges, uint
 void report_trimmed(const char* name, uint64_t trimmed, const struct timespec* started, uint64_t free_bytes,
                     uint64_t total_bytes, int mounted);
 void report_dry_sample(uint32_t ndirty, uint32_t draws);
-void report_verified(uint32_t draws, uint32_t ndirty, uint32_t cleared, double bound);
-void report_not_confirmed(uint32_t cleared, uint32_t ndirty);
+void report_verified(uint32_t draws, uint32_t ndirty, uint32_t target);
+void report_not_confirmed(void);
 
 enum report_confirm report_confirm_first_trim(const char* where);
 
