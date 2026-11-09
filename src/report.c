@@ -81,7 +81,7 @@ void report_usage(const char *prog)
             "          space still holds leftovers.\n"
             "  -y      skip the first-run confirmation; write no marker.\n"
             "exit status: 0 success, 1 refused or error, 2 usage, 3 trim not confirmed\n"
-            "  (-v), 4 trimmed but the volume did not mount again.\n",
+            "  (-v), 4 the volume was unmounted and did not mount again.\n",
             prog);
 }
 

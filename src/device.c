@@ -57,7 +57,7 @@ int device_open(struct device *d, const char *raw, int dry, const char *name, ch
     if (tb) {
         char *end;
         unsigned long v = strtoul(tb, &end, 10);
-        if (*end || v < d->blk || (v & (v - 1)))
+        if (*end || v < d->blk || v > UINT32_MAX || (v & (v - 1)))
             return refuse(err, err_cap, "EXFATRIM_TEST_BLOCK must be a power of two of at least %u.", d->blk);
         d->align = (uint32_t)v;
     }

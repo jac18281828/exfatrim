@@ -23,7 +23,7 @@
  *         sudo exfatrim -y SSD             (trim without the first-run confirmation)
  *
  * Exit status: 0 success, 1 refused or error, 2 usage, 3 trim not confirmed
- * (-v), 4 trimmed but the volume did not mount again.
+ * (-v), 4 the volume was unmounted and did not mount again.
  *
  * Test hooks (environment): EXFATRIM_TEST_BLOCK raises the alignment unit to
  * a power of two at or above the device block size; EXFATRIM_TEST_SKIP_FSCK=1

@@ -212,7 +212,7 @@ small_volume_cases() {
     local re arg before
     new_volume RAW 64m 512
     mount_volume
-    populate 40 200000 30
+    populate 300 6000 1
 
     for arg in "$VOL" "$MP" "${DISK#/dev/}" "$DISK" "$RAW"; do
         run "$BIN" -n "$arg"
@@ -227,6 +227,9 @@ small_volume_cases() {
 
     run env EXFATRIM_TEST_BLOCK=3000 "$BIN" -n "$VOL"
     [ "$RC" -eq 1 ] || fail "bad EXFATRIM_TEST_BLOCK accepted: exit $RC: $OUT"
+    run env EXFATRIM_TEST_BLOCK=4294967296 "$BIN" -n "$VOL"
+    [ "$RC" -eq 1 ] || fail "EXFATRIM_TEST_BLOCK above UINT32_MAX accepted: exit $RC: $OUT"
+    [[ $OUT == *"EXFATRIM_TEST_BLOCK must be a power of two"* ]] || fail "EXFATRIM_TEST_BLOCK above UINT32_MAX: $OUT"
     run env EXFATRIM_TEST_BLOCK=4096 "$BIN" -y -v "$VOL"
     expect_trim_confirmed "4096-byte alignment on 512-byte clusters"
     check_sums "4096-byte alignment"
