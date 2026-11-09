@@ -1,7 +1,8 @@
 """Write leftovers into the first free cluster of a test image.
 
 usage: fill_first_free_cluster.py DEVICE
-Prints the index of the cluster written. Every other cluster stays untouched.
+Prints the bitmap index of the cluster written (the cluster number minus 2).
+Every other cluster stays untouched.
 """
 import os
 import sys
@@ -14,7 +15,8 @@ bm = vol.bitmap()
 for i in range(vol.nclus):
     if not bm[i >> 3] >> (i & 7) & 1:
         vol.f.seek(vol.cluster_off(i + 2))
-        assert vol.f.write(b"\xa5" * vol.clus) == vol.clus
+        if vol.f.write(b"\xa5" * vol.clus) != vol.clus:
+            sys.exit("short write")
         print(i)
         break
 else:
