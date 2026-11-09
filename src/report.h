@@ -28,12 +28,6 @@ void report_dry_sample(uint32_t ndirty, uint32_t draws);
 void report_verified(uint32_t draws, uint32_t ndirty, uint32_t cleared, double bound);
 void report_not_confirmed(uint32_t cleared, uint32_t ndirty);
 
-/*
- * Before the first trim per user, shows the notice for where (a mount point or
- * a /dev path) and waits for an answer on stdin. A marker file under
- * /var/db/exfatrim/lectured, or under EXFATRIM_TEST_LECTURE_DIR, records a
- * confirmed notice and suppresses it afterwards.
- */
 enum report_confirm report_confirm_first_trim(const char* where);
 
 #endif

@@ -69,12 +69,6 @@ struct exfat_volume {
   uint64_t total_bytes;
 };
 
-/*
- * Parses and cross-checks the exFAT volume behind src. Returns EXFAT_OK or the
- * first refusal, with its user-facing text in reason. Never exits and never
- * prints. A dirty volume flag refuses unless allow_dirty is set. On a refusal
- * v holds nothing to release.
- */
 enum exfat_status exfat_load(const struct exfat_source* src, int allow_dirty, struct exfat_volume* v, char* reason,
                              size_t reason_cap);
 

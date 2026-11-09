@@ -20,11 +20,6 @@ struct volume {
 extern struct volume g_volume;
 extern volatile sig_atomic_t g_stop;
 
-/*
- * Closes the held device, mounts the volume again when exfatrim unmounted it,
- * prints one error line and exits: EXIT_NOT_REMOUNTED when the volume stays
- * unmounted, else EXIT_REFUSED.
- */
 void die(const char* fmt, ...) __attribute__((format(printf, 1, 2), noreturn));
 
 void volume_resolve(const char* arg);

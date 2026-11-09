@@ -21,11 +21,6 @@ struct walk_plan {
 
 enum walk_status { WALK_OK = 0, WALK_E_NOMEM, WALK_E_OUTSIDE, WALK_E_ALIGN };
 
-/*
- * Walks the free runs of bitmap and shrinks each inward to the alignment unit,
- * so no extent reaches a byte outside a free cluster. Never exits and never
- * prints; a failure leaves plan empty and writes its text to reason.
- */
 enum walk_status walk_runs(const struct exfat_fs* f, const uint8_t* bitmap, uint64_t align, struct walk_plan* plan,
                            char* reason, size_t reason_cap);
 
