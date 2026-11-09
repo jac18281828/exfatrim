@@ -17,4 +17,5 @@ while time.time() < deadline and not os.path.exists(done_file):
     except OSError as e:
         if e.errno == errno.EBUSY:
             busy += 1
+    time.sleep(0.01)
 print(busy)
