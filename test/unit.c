@@ -39,6 +39,15 @@ static int g_tests_failed;
     }                                                                            \
   } while (0)
 
+#define REQUIRE(cond)                                                                     \
+  do {                                                                                    \
+    if (!(cond)) {                                                                        \
+      fprintf(stderr, "  %s:%d: required check failed: %s\n", __FILE__, __LINE__, #cond); \
+      g_failed++;                                                                         \
+      return;                                                                             \
+    }                                                                                     \
+  } while (0)
+
 static void put16(uint8_t* p, uint16_t v) {
   p[0] = (uint8_t)v;
   p[1] = (uint8_t)(v >> 8);
@@ -168,7 +177,7 @@ static void test_valid_volume(void) {
   uint8_t* img = build_image();
   struct loaded l;
   load(img, 0, &l);
-  CHECK(l.status == EXFAT_OK);
+  REQUIRE(l.status == EXFAT_OK);
   CHECK(l.v.fs.nclus == NCLUS);
   CHECK(l.v.fs.clus == BPS);
   CHECK(l.v.fs.bps == BPS);
@@ -400,7 +409,7 @@ static void test_walk_every_cluster_free(void) {
   walk_case_init(&w, 512, 64, 12288);
   struct walk_plan p;
   CHECK(walk(&w, 4096, &p) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == 12288 && p.v[0].e == 12288 + 64 * 512);
   CHECK(p.v[0].first == 0 && p.v[0].n == 64);
   CHECK(p.bytes == 64 * 512);
@@ -439,7 +448,7 @@ static void test_walk_shrinks_inward(void) {
   fill_allocated(w.bitmap, 31, 64);
   struct walk_plan p;
   CHECK(walk(&w, 4096, &p) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == 16384);
   CHECK(p.v[0].e == 24576);
   CHECK(p.v[0].first == 8);
@@ -455,7 +464,7 @@ static void test_walk_run_touching_heap_end(void) {
   fill_allocated(w.bitmap, 0, 40);
   struct walk_plan p;
   CHECK(walk(&w, 4096, &p) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == 32768);
   CHECK(p.v[0].e == 12288 + 64 * 512);
   walk_release(&p);
@@ -467,7 +476,7 @@ static void test_walk_unaligned_heap_end(void) {
   fill_allocated(w.bitmap, 0, 40);
   struct walk_plan p;
   CHECK(walk(&w, 4096, &p) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == 32768);
   CHECK(p.v[0].e == 40960);
   CHECK(p.v[0].e <= w.fs.heap_off + 61 * 512);
@@ -481,7 +490,7 @@ static void test_walk_clusters_smaller_than_unit(void) {
   fill_allocated(w.bitmap, 2, 5);
   struct walk_plan p;
   CHECK(walk(&w, 4096, &p) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == 16384);
   CHECK(p.v[0].e == 12288 + 64 * 512);
   CHECK(p.v[0].first == 8);
@@ -495,7 +504,7 @@ static void test_walk_clusters_larger_than_unit(void) {
   fill_allocated(w.bitmap, 6, 32);
   struct walk_plan p;
   CHECK(walk(&w, 512, &p) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == 8192 + 3 * 4096);
   CHECK(p.v[0].e == 8192 + 6 * 4096);
   CHECK(p.v[0].first == 3 && p.v[0].n == 3);
@@ -510,7 +519,7 @@ static void test_walk_population_prefix(void) {
   fill_allocated(w.bitmap, 40, 64);
   struct walk_plan p;
   CHECK(walk(&w, 4096, &p) == WALK_OK);
-  CHECK(p.n == 2);
+  REQUIRE(p.n == 2);
   CHECK(p.v[0].first == 8 && p.v[0].n == 8 && p.v[0].before == 0);
   CHECK(p.v[1].first == 24 && p.v[1].n == 16 && p.v[1].before == 8);
   CHECK(p.population == 24);
@@ -533,7 +542,7 @@ static void test_walk_over_a_parsed_volume(void) {
   struct walk_plan p;
   char reason[128];
   CHECK(walk_runs(&l.v.fs, l.v.bitmap, 4096, &p, reason, sizeof reason) == WALK_OK);
-  CHECK(p.n == 1);
+  REQUIRE(p.n == 1);
   CHECK(p.v[0].s == (uint64_t)(HEAP_SECTOR + FREE_FIRST_INDEX) * BPS);
   CHECK(p.v[0].e == (uint64_t)VOL_SECTORS * BPS);
   walk_release(&p);
