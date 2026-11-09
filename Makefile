@@ -16,12 +16,18 @@ all: exfatrim
 exfatrim: $(SRC) $(HDR)
 	$(CC) $(CFLAGS) $(SRC) -o $@
 
-test/unit: test/unit.c $(UNIT_SRC) src/exfat.h src/walk.h
+test/unit: test/unit.c $(UNIT_SRC) src/device.h src/exfat.h src/verify.h src/walk.h
 	$(CC) $(CFLAGS) test/unit.c $(UNIT_SRC) -o $@
 
-test: all test/unit
+test: test/unit
 	test/unit
+
+integration: all
 	test/test.sh
+
+check: format-check test integration
+	shellcheck test/test.sh
+	python3 -I -m py_compile test/*.py
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin
@@ -38,4 +44,4 @@ format-check:
 clean:
 	rm -rf exfatrim exfatrim.dSYM test/unit test/unit.dSYM
 
-.PHONY: all test install format format-check clean
+.PHONY: all test integration check install format format-check clean

@@ -28,5 +28,7 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - name: make test
+      - name: Unit tests
         run: make test
+      - name: Integration tests
+        run: make integration

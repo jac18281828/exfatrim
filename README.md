@@ -70,10 +70,16 @@ drive that ignores TRIM fails the check:
 
 ## Development
 
-`make test` runs unit tests and end-to-end tests on disk images it creates.
-It needs macOS 26 or later and `python3`. `make format` formats the sources
-with clang-format 22.1.8. CI runs the tests and a format check on every push,
-and commit messages follow Conventional Commits.
+```sh
+make test           # unit tests, under a second
+make integration    # end-to-end tests on disk images it creates, about a minute
+make check          # everything CI runs
+make format         # format the sources with clang-format 22.1.8
+```
+
+The integration tests need macOS 26 or later and `python3`; `make check` also
+needs shellcheck and clang-format 22.1.8. CI runs the same checks on every
+push, and commit messages follow Conventional Commits.
 
 ## License
 
