@@ -116,7 +116,7 @@ raw_sum() {
 }
 
 expect_trim_confirmed() {
-    local re='Trim checked on ([0-9]+) samples; too few leftovers to check fully\.'
+    local re='Trim checked on ([0-9]+) samples?; too few leftovers to check fully\.'
     [ "$RC" -eq 0 ] || fail "$1: exit $RC: $OUT"
     if [[ $OUT == *"$CHECKED_FULL"* ]]; then
         return 0
@@ -200,7 +200,7 @@ expect_verify_line() {
 }
 
 verification_cases() {
-    local re='Trim checked on ([0-9]+) samples; too few leftovers to check fully\.' arg
+    local re='Trim checked on ([0-9]+) (samples?); too few leftovers to check fully\.' arg noun
     new_volume RAW 384m 131072
     mount_volume
     populate 120 3000000 200
@@ -232,6 +232,9 @@ verification_cases() {
     [ "$RC" -eq 0 ] || fail "too few leftovers: exit $RC: $OUT"
     [[ $STDOUT =~ $re ]] || fail "too few leftovers: no 'Trim checked on <n> samples' line on stdout: $OUT"
     [ "${BASH_REMATCH[1]}" -ge 1 ] || fail "too few leftovers: n is ${BASH_REMATCH[1]}: $OUT"
+    noun=samples
+    [ "${BASH_REMATCH[1]}" -eq 1 ] && noun=sample
+    [ "${BASH_REMATCH[2]}" = "$noun" ] || fail "too few leftovers: '${BASH_REMATCH[1]} ${BASH_REMATCH[2]}': $OUT"
     detach_volume
     pass "--verify 99.9 on a 512-cluster image prints the too-few line"
 

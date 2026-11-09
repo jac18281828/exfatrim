@@ -62,7 +62,7 @@ const char* report_human(uint64_t b, char* buf, size_t n) {
 
 void report_usage(const char* prog) {
   fprintf(stderr,
-          "usage: sudo %s [-n] [-v] [--verify <pct>] [-y] [volume]\n"
+          "usage: %s [-n] [-v] [--verify <pct>] [-y] [volume]\n"
           "  Unmounts an exFAT volume, TRIMs its free space, and mounts it again.\n"
           "  volume  name (SSD), mount point (/Volumes/SSD), or disk id (disk4s2).\n"
           "          Omit it when only one exFAT volume is mounted.\n"
@@ -148,7 +148,7 @@ void report_verified(uint32_t draws, uint32_t ndirty, uint32_t target) {
   else if (ndirty == 0)
     printf("  Trim checked: free space already reads as zeros.\n");
   else if (ndirty < target)
-    printf("  Trim checked on %u samples; too few leftovers to check fully.\n", ndirty);
+    printf("  Trim checked on %u sample%s; too few leftovers to check fully.\n", ndirty, ndirty == 1 ? "" : "s");
   else
     printf("  Trim checked: the drive cleared what was trimmed.\n");
 }

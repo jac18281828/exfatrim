@@ -13,6 +13,8 @@ are never touched. The leftovers of deleted files are discarded, so undelete
 tools can no longer recover them. `exfatrim` refuses the volume if any check
 fails. Keep a backup, as with any tool that writes to a disk.
 
+Tested on a 2 TB Crucial X9 Pro over USB-C on macOS 27.0.1, Apple silicon.
+
 ## Install
 
 ```sh
@@ -25,14 +27,14 @@ sudo make install        # installs to /usr/local/bin
 Run it about once a month, with the drive plugged in:
 
 ```sh
-sudo exfatrim                  # trim the one mounted exFAT volume
-sudo exfatrim SSD              # trim a volume by name
-sudo exfatrim /Volumes/SSD     # or by mount point
-sudo exfatrim -n               # dry run: show what would be trimmed
-sudo exfatrim -v               # trim, then check the drive cleared it
-sudo exfatrim --verify 99      # check at 99% confidence instead of 95%
-sudo exfatrim -n -v            # show how much free space holds leftovers
-sudo exfatrim -y SSD           # skip the first-run question (scripts)
+exfatrim                  # trim the one mounted exFAT volume
+exfatrim SSD              # trim a volume by name
+exfatrim /Volumes/SSD     # or by mount point
+exfatrim -n               # dry run: show what would be trimmed
+exfatrim -v               # trim, then check the drive cleared it
+exfatrim --verify 99      # check at 99% confidence instead of 95%
+exfatrim -n -v            # show how much free space holds leftovers
+exfatrim -y SSD           # skip the first-run question (scripts)
 ```
 
 A trim with `-v` prints three lines:
@@ -69,9 +71,9 @@ drive that ignores TRIM fails the check:
 ## Development
 
 `make test` runs unit tests and end-to-end tests on disk images it creates.
-It needs macOS 26 or later and `python3`, and no `sudo`. `make format`
-formats the sources with clang-format 22.1.8. CI runs the tests and a format
-check on every push, and commit messages follow Conventional Commits.
+It needs macOS 26 or later and `python3`. `make format` formats the sources
+with clang-format 22.1.8. CI runs the tests and a format check on every push,
+and commit messages follow Conventional Commits.
 
 ## License
 
