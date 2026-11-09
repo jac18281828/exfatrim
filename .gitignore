@@ -2,3 +2,4 @@ exfatrim
 *.o
 *.dSYM/
 __pycache__/
+test/unit
