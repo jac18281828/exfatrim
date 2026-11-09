@@ -103,6 +103,7 @@ static void adopt_mount(const struct statfs *m)
     if (strcmp(m->f_fstypename, "exfat")) die("%s is %s, not exFAT.", m->f_mntonname, m->f_fstypename);
     snprintf(g_volume.bsd, sizeof g_volume.bsd, "%s", strip_from(m->f_mntfromname));
     snprintf(g_volume.name, sizeof g_volume.name, "%s", strrchr(m->f_mntonname, '/') + 1);
+    snprintf(g_volume.where, sizeof g_volume.where, "%s", m->f_mntonname);
     struct statfs st;
     sync();
     if (statfs(m->f_mntonname, &st) < 0) die("Can't read free space on %s: %s", g_volume.name, strerror(errno));
@@ -158,6 +159,7 @@ void volume_resolve(const char *arg)
         }
     snprintf(g_volume.bsd, sizeof g_volume.bsd, "%s", id);
     snprintf(g_volume.name, sizeof g_volume.name, "%s", id);
+    snprintf(g_volume.where, sizeof g_volume.where, "/dev/%s", id);
 }
 
 static int still_mounted(void)

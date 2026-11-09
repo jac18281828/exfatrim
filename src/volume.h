@@ -10,6 +10,7 @@ struct volume {
     const char *prog;
     char name[256];
     char bsd[64];
+    char where[1100];
     int mounted;
     uint64_t df_free;
     int owe_remount;

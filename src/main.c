@@ -26,7 +26,12 @@
  *
  * Test hooks (environment): EXFATRIM_TEST_BLOCK raises the alignment unit to
  * a power of two at or above the device block size; EXFATRIM_TEST_SKIP_FSCK=1
- * skips the fsck_exfat gate.
+ * skips the fsck_exfat gate; EXFATRIM_TEST_LECTURE_DIR replaces
+ * /var/db/exfatrim/lectured, the directory of first-run markers.
+ *
+ * Before the first trim per user, exfatrim shows a notice and waits for y; the
+ * answer writes an empty marker file named for the user (SUDO_USER, else the
+ * real uid's name). -y skips the notice and writes no marker; -n never asks.
  */
 
 #include "main.h"
@@ -92,12 +97,14 @@ static void load_volume(struct device *device, struct exfat_volume *v, int dry, 
 int main(int argc, char **argv)
 {
     g_volume.prog = argv[0];
-    int dry = 0, verify = 0, opt;
-    while ((opt = getopt(argc, argv, "nvh")) != -1) {
+    int dry = 0, verify = 0, yes = 0, opt;
+    while ((opt = getopt(argc, argv, "nvyh")) != -1) {
         if (opt == 'n') {
             dry = 1;
         } else if (opt == 'v') {
             verify = 1;
+        } else if (opt == 'y') {
+            yes = 1;
         } else {
             report_usage(g_volume.prog);
             return EXIT_USAGE;
@@ -120,6 +127,13 @@ int main(int argc, char **argv)
     snprintf(dev, sizeof dev, "/dev/%s", g_volume.bsd);
 
     volume_require_access(raw, dry, arg, verify);
+
+    if (!dry && !yes) {
+        enum report_confirm answer = report_confirm_first_trim(g_volume.where);
+        if (answer == REPORT_CONFIRM_NO) die("Cancelled. Nothing changed.");
+        if (answer == REPORT_CONFIRM_NO_TTY)
+            die("The first trim asks for confirmation. Run exfatrim in a terminal, or pass -y.");
+    }
 
     volume_install_signals();
 

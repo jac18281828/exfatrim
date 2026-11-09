@@ -1,9 +1,17 @@
 #include "report.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <math.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#define LECTURE_DIR "/var/db/exfatrim/lectured"
 
 static int g_tty;
 
@@ -62,7 +70,7 @@ const char *report_human(uint64_t b, char *buf, size_t n)
 void report_usage(const char *prog)
 {
     fprintf(stderr,
-            "usage: sudo %s [-n] [-v] [volume]\n"
+            "usage: sudo %s [-n] [-v] [-y] [volume]\n"
             "  Unmounts an exFAT volume, TRIMs its free space, and mounts it again.\n"
             "  volume  name (\"My SSD\"), mount point, or disk id (disk4s2).\n"
             "          Omit it when only one exFAT volume is mounted.\n"
@@ -71,6 +79,7 @@ void report_usage(const char *prog)
             "          trim and report how many the drive now reads as zeros, with a\n"
             "          95%% confidence bound. With -n, report how much sampled free\n"
             "          space still holds deleted data.\n"
+            "  -y      skip the first-run confirmation; write no marker.\n"
             "exit status: 0 success, 1 refused or error, 2 usage, 3 trim not confirmed\n"
             "  (-v), 4 trimmed but the volume did not mount again.\n",
             prog);
@@ -169,4 +178,80 @@ void report_not_confirmed(uint32_t cleared, uint32_t ndirty)
             "✗ Trim not confirmed: %u of %u dirty free clusters read as zeros afterwards. "
             "Either the drive ignored TRIM or it does not return zeros for trimmed blocks.\n",
             cleared, ndirty);
+}
+
+static int marker_path(char *path, size_t cap)
+{
+    const char *dir = getenv("EXFATRIM_TEST_LECTURE_DIR");
+    if (!dir || !*dir) dir = LECTURE_DIR;
+    const char *user = getenv("SUDO_USER");
+    if (!user || !*user) {
+        struct passwd *pw = getpwuid(getuid());
+        user = pw ? pw->pw_name : NULL;
+    }
+    if (!user || !*user || strchr(user, '/') || !strcmp(user, ".") || !strcmp(user, "..")) return -1;
+    return snprintf(path, cap, "%s/%s", dir, user) < (int)cap ? 0 : -1;
+}
+
+static int make_dirs(const char *path)
+{
+    char buf[PATH_MAX];
+    if (snprintf(buf, sizeof buf, "%s", path) >= (int)sizeof buf) return -1;
+    for (char *p = buf + 1;; p++) {
+        if (*p != '/' && *p != 0) continue;
+        char sep = *p;
+        *p = 0;
+        if (mkdir(buf, 0755) == 0) chmod(buf, 0755);
+        else if (errno != EEXIST) return -1;
+        *p = sep;
+        if (!sep) return 0;
+    }
+}
+
+static int write_marker(const char *path)
+{
+    char dir[PATH_MAX];
+    snprintf(dir, sizeof dir, "%s", path);
+    char *slash = strrchr(dir, '/');
+    if (slash) {
+        *slash = 0;
+        if (make_dirs(dir) != 0) return -1;
+    }
+    int fd = open(path, O_WRONLY | O_CREAT, 0644);
+    if (fd < 0) return -1;
+    return close(fd);
+}
+
+static int answered_yes(void)
+{
+    char line[64];
+    if (!fgets(line, sizeof line, stdin)) return 0;
+    size_t n = strcspn(line, "\r\n");
+    line[n] = 0;
+    return (line[0] == 'y' || line[0] == 'Y') && line[1] == 0;
+}
+
+enum report_confirm report_confirm_first_trim(const char *where)
+{
+    char path[PATH_MAX];
+    int have_path = marker_path(path, sizeof path) == 0;
+    if (have_path && access(path, F_OK) == 0) return REPORT_CONFIRM_YES;
+    if (!isatty(STDIN_FILENO)) return REPORT_CONFIRM_NO_TTY;
+
+    fprintf(stderr,
+            "exfatrim clears the deleted files on %s.\n"
+            "Your files and folders will not be changed.  After a trim undelete or recovery\n"
+            "tools will no longer bring back any deleted file.\n"
+            "\n"
+            "If you are trying to recover deleted files from this volume STOP HERE.\n"
+            "\n"
+            "Continue? [y/N]\n",
+            where);
+    fflush(stderr);
+    if (!answered_yes()) return REPORT_CONFIRM_NO;
+
+    if (!have_path || write_marker(path) != 0)
+        fprintf(stderr, "Couldn't record the confirmation (%s); the notice will show again next run.\n",
+                have_path ? strerror(errno) : "no user name");
+    return REPORT_CONFIRM_YES;
 }
