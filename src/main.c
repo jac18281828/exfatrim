@@ -28,7 +28,8 @@
  * Test hooks (environment): EXFATRIM_TEST_BLOCK raises the alignment unit to
  * a power of two at or above the device block size; EXFATRIM_TEST_SKIP_FSCK=1
  * skips the fsck_exfat gate; EXFATRIM_TEST_LECTURE_DIR replaces
- * /var/db/exfatrim/lectured, the directory of first-run markers.
+ * /var/db/exfatrim/lectured, the directory of first-run markers;
+ * EXFATRIM_TEST_NO_UNMAP=1 makes the device report no UNMAP support.
  *
  * Before the first trim per user, exfatrim shows a notice and waits for y; the
  * answer writes an empty marker file named for the user (SUDO_USER, else the

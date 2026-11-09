@@ -20,8 +20,10 @@ enum device_probe device_probe(const char* raw, int dry, int* open_errno) {
       return DEVICE_PROBE_BUSY;
     return DEVICE_PROBE_OPEN_FAILED;
   }
+  const char* no_unmap = getenv("EXFATRIM_TEST_NO_UNMAP");
   uint32_t features = 0;
-  int bad = ioctl(probe, DKIOCGETFEATURES, &features) < 0 || !(features & DK_FEATURE_UNMAP);
+  int bad = (no_unmap && !strcmp(no_unmap, "1")) || ioctl(probe, DKIOCGETFEATURES, &features) < 0 ||
+            !(features & DK_FEATURE_UNMAP);
   close(probe);
   return bad ? DEVICE_PROBE_NO_UNMAP : DEVICE_PROBE_OK;
 }

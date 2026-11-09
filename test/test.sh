@@ -350,6 +350,14 @@ small_volume_cases() {
     check_sums "locked device"
     pass "refuses a device another process holds"
 
+    run_split env EXFATRIM_TEST_NO_UNMAP=1 "$BIN" -y "$VOL"
+    [ "$RC" -eq 1 ] || fail "no UNMAP: expected exit 1, got $RC: $OUT"
+    line_in "✗ macOS reports $VOL can't accept TRIM over this connection. Nothing changed." "$STDERR" \
+        || fail "no UNMAP: the refusal is not on stderr: $OUT"
+    expect_mounted "no UNMAP"
+    check_sums "no UNMAP"
+    pass "refuses a device that reports no UNMAP"
+
     expect_lock_held_during_run
     pass "holds an exclusive lock on the device during a run"
 
