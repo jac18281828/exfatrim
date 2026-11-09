@@ -1,11 +1,13 @@
 CC = clang
 CFLAGS = -O2 -Wall -Wextra -Werror
 PREFIX ?= /usr/local
+SRC = src/device.c src/exfat.c src/main.c src/report.c src/trim.c src/verify.c src/volume.c src/walk.c
+HDR = src/device.h src/exfat.h src/main.h src/report.h src/trim.h src/verify.h src/volume.h src/walk.h
 
 all: exfatrim
 
-exfatrim: exfatrim.c
-	$(CC) $(CFLAGS) exfatrim.c -o $@
+exfatrim: $(SRC) $(HDR)
+	$(CC) $(CFLAGS) $(SRC) -o $@
 
 test: all
 	test/test.sh

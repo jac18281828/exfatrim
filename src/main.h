@@ -1,0 +1,9 @@
+#ifndef EXFATRIM_MAIN_H
+#define EXFATRIM_MAIN_H
+
+#define EXIT_REFUSED 1
+#define EXIT_USAGE 2
+#define EXIT_UNCONFIRMED 3
+#define EXIT_NOT_REMOUNTED 4
+
+#endif
