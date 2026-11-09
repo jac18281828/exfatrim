@@ -183,9 +183,11 @@ static int still_mounted(void) {
   return 0;
 }
 
-static const char* command_as_typed(void) {
+static void die_needs_admin(void) {
   char* line = shell_join(g_volume.argc, g_volume.argv);
-  return line ? line : g_volume.prog;
+  if (!line)
+    die("Out of memory.");
+  die("Needs administrator rights. Run:  sudo %s", line);
 }
 
 void volume_require_access(const char* raw, int dry) {
@@ -194,7 +196,7 @@ void volume_require_access(const char* raw, int dry) {
   case DEVICE_PROBE_OK:
     return;
   case DEVICE_PROBE_NEEDS_ADMIN:
-    die("Needs administrator rights. Run:  sudo %s", command_as_typed());
+    die_needs_admin();
   case DEVICE_PROBE_BUSY:
     die("Another process holds %s, so exfatrim can't lock it. Nothing changed.", raw);
   case DEVICE_PROBE_OPEN_FAILED:
