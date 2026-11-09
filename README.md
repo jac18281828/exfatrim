@@ -49,7 +49,8 @@ the drive over its connection, `exfatrim` cannot help that drive.
 
 `-v` picks up to 299 random free clusters that still hold leftovers, reads
 them before the trim and again after: about 80 MB on a drive with 128 KiB
-clusters. A drive that ignores TRIM fails the check:
+clusters, and up to about 430 MB when few free clusters hold leftovers. A
+drive that ignores TRIM fails the check:
 
 ```
 ✗ Trim not confirmed: the drive still returns old data. It may ignore TRIM, or keep data until it erases.
@@ -60,7 +61,7 @@ clusters. A drive that ignores TRIM fails the check:
 | Code | Meaning |
 |---|---|
 | 0 | Done |
-| 1 | Refused or failed; nothing was trimmed unless the message says so |
+| 1 | Refused or failed |
 | 2 | Bad arguments |
 | 3 | Trimmed, but `-v` could not confirm the drive cleared it |
 | 4 | The volume did not mount again; run `diskutil mount <disk>` or replug |
@@ -68,9 +69,9 @@ clusters. A drive that ignores TRIM fails the check:
 ## Development
 
 `make test` runs unit tests and end-to-end tests on disk images it creates.
-It needs macOS 26 or later and no `sudo`. `make format` formats the sources
-with clang-format 22.1.8. CI runs both on every push, and commit messages
-follow Conventional Commits.
+It needs macOS 26 or later and `python3`, and no `sudo`. `make format`
+formats the sources with clang-format 22.1.8. CI runs the tests and a format
+check on every push, and commit messages follow Conventional Commits.
 
 ## License
 
