@@ -1,9 +1,7 @@
 name: ci
-
 on:
   push:
   pull_request:
-
 jobs:
   build:
     runs-on: macos-26
@@ -16,8 +14,16 @@ jobs:
       - name: shellcheck
         run: shellcheck test/test.sh
       - name: py_compile
-        run: python3 -I -m py_compile test/verify_zero.py test/exfat_patch.py test/hold_lock.py
-
+        run: python3 -I -m py_compile test/*.py
+      - name: Install clang-format
+        run: |
+          python3 -m venv .venv-format
+          .venv-format/bin/pip install clang-format==22.1.8
+          echo "$PWD/.venv-format/bin" >> "$GITHUB_PATH"
+      - name: Format check
+        run: |
+          clang-format --version
+          make format-check
   test:
     runs-on: macos-26
     steps:
